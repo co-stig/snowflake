@@ -15,35 +15,60 @@ const intersect = ([s0, s1], [c0, c1]) => {
     }
 };
 
-const cutTriangle = ([u, v, w], [c0, c1]) => {
+const cutTriangle = (triangle, [c0, c1]) => {
+    const [u, v, w] = triangle.vertices;
     const uv = intersect([u, v], [c0, c1]);
     const vw = intersect([v, w], [c0, c1]);
     const wu = intersect([w, u], [c0, c1]);
     if (uv !== undefined && wu !== undefined) {
         // Cut out corner "U"
-        return [[u, uv, wu], [uv, v, wu], [v, w, wu]];
+        return [
+            triangle.inherit([u, uv, wu]),
+            triangle.inherit([uv, v, wu]),
+            triangle.inherit([v, w, wu])
+        ];
     } else if (uv !== undefined && vw !== undefined) {
         // Cut out corner "V"
-        return [[v, vw, uv], [vw, w, uv], [w, u, uv]];
+        return [
+            triangle.inherit([v, vw, uv]),
+            triangle.inherit([vw, w, uv]),
+            triangle.inherit([w, u, uv])
+        ];
     } else if (vw !== undefined && wu !== undefined) {
         // Cut out corner "W"
-        return [[w, wu, vw], [wu, u, vw], [u, v, vw]];
+        return [
+            triangle.inherit([w, wu, vw]),
+            triangle.inherit([wu, u, vw]),
+            triangle.inherit([u, v, vw])
+        ];
     } else if (uv !== undefined) {
         // Cuts UV through W
-        return [[w, u, uv], [uv, v, w]];
+        return [
+            triangle.inherit([w, u, uv]),
+            triangle.inherit([uv, v, w])
+        ];
     } else if (vw !== undefined) {
         // Cuts VW through U
-        return [[u, v, vw], [vw, w, u]];
+        return [
+            triangle.inherit([u, v, vw]),
+            triangle.inherit([vw, w, u])
+        ];
     } else if (wu !== undefined) {
         // Cuts WU through V
-        return [[v, w, wu], [wu, u, v]];
+        return [
+            triangle.inherit([v, w, wu]),
+            triangle.inherit([wu, u, v])
+        ];
     } else {
         // The entire triangle is on one of the sides
-        return [[u, v, w]];
+        return [
+            triangle.inherit([u, v, w])
+        ];
     }
 };
 
-const getSide = ([u, v, w], [c0, c1]) => {
+const getSide = (triangle, [c0, c1]) => {
+    const [u, v, w] = triangle.vertices;
     const cx = (u.x + v.x + w.x) / 3;
     const cy = (u.y + v.y + w.y) / 3;
     const d = cy * (c1.x - c0.x) + c0.y * (cx - c1.x) + c1.y * (c0.x - cx);
