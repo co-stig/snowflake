@@ -29,7 +29,6 @@ class Triangle {
     }
 
     reflect(line) {
-        console.log('Reflect', line);
         const [u, v, w] = this.vertices;
         // TODO: Animate this via rotation somehow
         this.vertices = [
@@ -133,10 +132,10 @@ function initCircle(n, r) {
 //let last = new Transform(undefined, 'init', initCircle(20, 0.5));
 let last = new Transform(undefined, 'init', initSquare());
 
-let scene, camera, renderer;
-let R_FOLD = 0.1;
-let R_CUT = 0.5;
-let R = 1;
+let scene, camera, renderer, ruler, rulerA, rulerB;
+let R = 0.5;
+let R_FOLD = R;
+let R_CUT = R;
 let step = 0;
 
 const toGeometry = (triangles) => {
@@ -166,13 +165,18 @@ const randomLine = (radius) => {
     ]
 };
 
+const selectedLine = () => {
+    return [rulerA.position, rulerB.position]
+};
+
 const toLineGeometry = ([c0, c1], z) => (new THREE.Line(
     new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(c0.x, c0.y, z),
         new THREE.Vector3(c1.x, c1.y, z),
     ]),
     new THREE.LineBasicMaterial({
-        color: 0x555555
+        color: 0x555555,
+        linewidth: 1
     })
 ));
 
@@ -212,7 +216,17 @@ function init() {
     light.position.set(0, 1, 2);
     scene.add(light);
 
+    rulerA = new THREE.Mesh(
+        new THREE.SphereGeometry(0.05, 32, 16),
+        new THREE.MeshBasicMaterial({ color: 0x550000 })
+    );
+    rulerB = new THREE.Mesh(
+        new THREE.SphereGeometry(0.05, 32, 16),
+        new THREE.MeshBasicMaterial({ color: 0x005500 })
+    );
+
     updateScene();
+    displayLine(randomLine(R))
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.x = 0.5;
@@ -223,12 +237,22 @@ function init() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.target.set(0.5, 0.5, 0.5);   // Center
-    controls.update();
+    //const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    //controls.target.set(0.5, 0.5, 0.5);   // Center
+    //controls.update();
 
     window.addEventListener( 'resize', onResize, false);
     document.addEventListener('keydown', onDocumentKeyDown, false);
+
+    const controls = new DragControls(
+        [rulerA, rulerB],
+        camera,
+        renderer.domElement
+    );
+    controls.addEventListener('dragend', function(event) {
+        updateScene();
+        displayLine([rulerA.position, rulerB.position]);
+    });
 
     update();
 }
@@ -258,7 +282,7 @@ function unfoldLast() {
 }
 
 function updateScene() {
-    scene.children = [];
+    scene.children = [rulerA, rulerB];
     last.triangles.forEach(t => {
         const color = new THREE.Color();
         color.setHSL(t.hue, 0.5, 0.5);
@@ -273,18 +297,22 @@ function updateScene() {
 }
 
 function displayLine(l) {
-    // Paint circle, line and intersections
-    let topLayer = 0.1;
+    // Paint outer circle, line and intersections
+    let topLayer = 0.01;
     scene.add(circle(R, topLayer))
     scene.add(toLineGeometry(l, topLayer));
-    last.triangles.forEach(t => {
-        const pt1 = intersect([t.vertices[0], t.vertices[1]], l);
-        if (pt1 !== undefined) scene.add(toPoint(pt1, topLayer));
-        const pt2 = intersect([t.vertices[1], t.vertices[2]], l);
-        if (pt2 !== undefined) scene.add(toPoint(pt2, topLayer));
-        const pt3 = intersect([t.vertices[2], t.vertices[0]], l);
-        if (pt3 !== undefined) scene.add(toPoint(pt3, topLayer));
-    });
+    rulerA.position.x = l[0].x;
+    rulerA.position.y = l[0].y;
+    rulerB.position.x = l[1].x;
+    rulerB.position.y = l[1].y;
+    // last.triangles.forEach(t => {
+    //     const pt1 = intersect([t.vertices[0], t.vertices[1]], l);
+    //     if (pt1 !== undefined) scene.add(toPoint(pt1, topLayer));
+    //     const pt2 = intersect([t.vertices[1], t.vertices[2]], l);
+    //     if (pt2 !== undefined) scene.add(toPoint(pt2, topLayer));
+    //     const pt3 = intersect([t.vertices[2], t.vertices[0]], l);
+    //     if (pt3 !== undefined) scene.add(toPoint(pt3, topLayer));
+    // });
 }
 
 function onDocumentKeyDown(event) {
@@ -298,14 +326,14 @@ function onDocumentKeyDown(event) {
         updateScene();
     } else if (event.which == 32) {
         // SPACE to Fold
-        const l = randomLine(R_FOLD);
+        const l = selectedLine();
         last = new Transform(last, 'fold', l);
         step++;
         updateScene();
         displayLine(l);
     } else if (event.which == 67) {
         // "C" to Cut
-        const l = randomLine(R_CUT);
+        const l = selectedLine();
         last = new Transform(last, 'cut', l);
         step++;
         updateScene();
