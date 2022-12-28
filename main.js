@@ -132,7 +132,7 @@ function initCircle(n, r) {
 //let last = new Transform(undefined, 'init', initCircle(20, 0.5));
 let last = new Transform(undefined, 'init', initSquare());
 
-let scene, camera, renderer, ruler, rulerA, rulerB;
+let scene, camera, renderer, rulerA, rulerB;
 let R = 0.5;
 let R_FOLD = R;
 let R_CUT = R;
