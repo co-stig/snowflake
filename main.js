@@ -129,23 +129,22 @@ function initCircle(n, r) {
     );
 }
 
-//let last = new Transform(undefined, 'init', initCircle(20, 0.5));
-let last = new Transform(undefined, 'init', initSquare());
+let last = new Transform(undefined, 'init', initCircle(20, 0.5));
+//let last = new Transform(undefined, 'init', initSquare());
 
 let scene, camera, renderer;
-let R_FOLD = 0.1;
-let R_CUT = 0.5;
 let R = 1;
 let step = 0;
 
-let rulerA = new THREE.Mesh(
+const rulerA = new THREE.Mesh(
     new THREE.SphereGeometry(0.05, 32, 16),
-    new THREE.MeshBasicMaterial({ color: 0x550000 })
-);
-let rulerB = new THREE.Mesh(
+    new THREE.MeshStandardMaterial({ color: 0x440000 })
+), rulerB = new THREE.Mesh(
     new THREE.SphereGeometry(0.05, 32, 16),
-    new THREE.MeshBasicMaterial({ color: 0x005500 })
-);
+    new THREE.MeshStandardMaterial({ color: 0x440000 })
+), light = new THREE.AmbientLight(0xFFFFFF, 3);
+
+const topLayer = 0.01;
 
 const toGeometry = (triangles) => {
     const geometry = new THREE.Geometry();
@@ -162,6 +161,27 @@ const toGeometry = (triangles) => {
             new THREE.Vector3(0, 0, 1)
         )
     )));
+    geometry.computeFaceNormals();
+    return geometry;
+};
+
+const rulerGeometry = (line) => {
+    const geometry = new THREE.Geometry();
+    let shift = {
+        x: line[0].y - line[1].y,
+        y: line[1].x - line[0].x
+    };
+    geometry.vertices.push(...[
+        new THREE.Vector3(line[0].x, line[0].y, topLayer),
+        new THREE.Vector3(line[1].x, line[1].y, topLayer),
+        new THREE.Vector3(line[0].x + shift.x, line[0].y + shift.y, topLayer),
+        new THREE.Vector3(line[1].x + shift.x, line[1].y + shift.y, topLayer),
+    ]);
+    geometry.faces.push(...[
+        new THREE.Face3(0, 1, 2, new THREE.Vector3(0, 0, 1)),
+        new THREE.Face3(1, 3, 2, new THREE.Vector3(0, 0, 1)),
+    ]);
+    console.log('Ruler', geometry);
     return geometry;
 };
 
@@ -170,6 +190,10 @@ const selectedLine = () => {
         {x: rulerA.position.x, y: rulerA.position.y},
         {x: rulerB.position.x, y: rulerB.position.y},
     ]
+};
+
+const isSelectedLine = () => {
+    return rulerA.position.x !== rulerB.position.x || rulerA.position.y !== rulerB.position.y;
 };
 
 const randomLine = (radius) => {
@@ -181,51 +205,9 @@ const randomLine = (radius) => {
     ]
 };
 
-const toLineGeometry = ([c0, c1], z) => (new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(c0.x, c0.y, z),
-        new THREE.Vector3(c1.x, c1.y, z),
-    ]),
-    new THREE.LineBasicMaterial({
-        color: 0x555555
-    })
-));
-
-const toPoint = (pt, z) => {
-    let geometry = new THREE.Geometry();
-    geometry.vertices.push(new THREE.Vector3(pt.x, pt.y, z));
-    return new THREE.Points(
-        geometry,
-        new THREE.PointsMaterial({
-            size: 3,
-            sizeAttenuation: false,
-            color: 0x000000
-        })
-    );
-};
-
-const circle = (radius, z, pts = 100) => {
-    return new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints([...Array(pts).keys()].map(pt =>
-            new THREE.Vector3(
-                Math.sin(pt / (pts - 1) * 2 * Math.PI) * radius + 0.5,
-                Math.cos(pt / (pts - 1) * 2 * Math.PI) * radius + 0.5,
-                z
-            )
-        )),
-        new THREE.LineBasicMaterial({
-            color: 0x555500
-        })
-    );
-};
-
 function init() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xFFFFFF);
-
-    const light = new THREE.DirectionalLight();
-    light.position.set(0, 1, 2);
-    scene.add(light);
+    scene.background = new THREE.Color(0x000000);
 
     updateScene();
 
@@ -243,10 +225,8 @@ function init() {
         camera,
         renderer.domElement
     );
-    controls.addEventListener('dragend', function(event) {
-        console.log('Dragged', selectedLine());
+    controls.addEventListener('drag', function(event) {
         updateScene();
-        displayLine(selectedLine());
     });
 
     window.addEventListener('resize', onResize, false);
@@ -280,25 +260,32 @@ function unfoldLast() {
 }
 
 function updateScene() {
-    scene.children = [rulerA, rulerB];
+    scene.children = [light, rulerA, rulerB];
     last.triangles.forEach(t => {
         const color = new THREE.Color();
         color.setHSL(t.hue, 0.5, 0.5);
-        const material = new THREE.MeshBasicMaterial({ color: color });
-        material.side = THREE.DoubleSide;
+        const material = new THREE.MeshStandardMaterial({
+            color: color,
+            side: THREE.DoubleSide,
+            opacity: 0.8,
+            transparent: true,
+        });
         let surface = new THREE.Mesh(
             toGeometry([t]),
             material
         );
         scene.add(surface);
     });
-}
-
-function displayLine(l) {
-    // Paint circle, line and intersections
-    let topLayer = 0.01;
-    scene.add(circle(R, topLayer))
-    scene.add(toLineGeometry(l, topLayer));
+    if (isSelectedLine()) {
+        scene.add(new THREE.Mesh(
+            rulerGeometry(selectedLine()),
+            new THREE.MeshStandardMaterial({
+                color: 0xFF0000,
+                opacity: 0.2,
+                transparent: true,
+            })
+        ));
+    }
 }
 
 function onDocumentKeyDown(event) {
@@ -316,14 +303,12 @@ function onDocumentKeyDown(event) {
         last = new Transform(last, 'fold', l);
         step++;
         updateScene();
-        displayLine(l);
     } else if (event.which == 67) {
         // "C" to Cut
         const l = selectedLine();
         last = new Transform(last, 'cut', l);
         step++;
         updateScene();
-        displayLine(l);
     }
 }
 
