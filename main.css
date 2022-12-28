@@ -1,4 +1,9 @@
-body{
+body {
     padding: 0;
     margin: 0;
+}
+
+.controls {
+    padding: 10pt;
+    margin: 10pt;
 }

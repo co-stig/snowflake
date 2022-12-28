@@ -107,8 +107,8 @@ class Transform {
 
 function initSquare() {
     return [
-        new Triangle([{x: 0, y: 0}, {x: 1, y: 0}, {x: 1, y: 1}], 0.25),
-        new Triangle([{x: 0, y: 0}, {x: 1, y: 1}, {x: 0, y: 1}], 0.75),
+        new Triangle([{x: -0.5, y: -0.5}, {x: 0.5, y: -0.5}, {x: 0.5, y: 0.5}], 0.25),
+        new Triangle([{x: -0.5, y: -0.5}, {x: 0.5, y: 0.5}, {x: -0.5, y: 0.5}], 0.75),
     ];
 }
 
@@ -117,14 +117,14 @@ function initCircle(n, r) {
     return [...Array(n).keys()].map(pt =>
         new Triangle([
             {
-                x: r * Math.sin(pt * M) + 0.5,
-                y: r * Math.cos(pt * M) + 0.5
+                x: r * Math.sin(pt * M),
+                y: r * Math.cos(pt * M)
             },
             {
-                x: r * Math.sin((pt + 1) * M) + 0.5,
-                y: r * Math.cos((pt + 1) * M) + 0.5
+                x: r * Math.sin((pt + 1) * M),
+                y: r * Math.cos((pt + 1) * M)
             },
-            {x: 0.5, y: 0.5}
+            {x: 0, y: 0}
         ], pt / n)
     );
 }
@@ -135,6 +135,7 @@ let last = new Transform(undefined, 'init', initCircle(20, 0.5));
 let scene, camera, renderer;
 let R = 1;
 let step = 0;
+let unfolded = false;
 
 const rulerA = new THREE.Mesh(
     new THREE.SphereGeometry(0.05, 32, 16),
@@ -142,7 +143,10 @@ const rulerA = new THREE.Mesh(
 ), rulerB = new THREE.Mesh(
     new THREE.SphereGeometry(0.05, 32, 16),
     new THREE.MeshStandardMaterial({ color: 0x440000 })
-), light = new THREE.AmbientLight(0xFFFFFF, 3);
+), light1 = new THREE.AmbientLight(0xFFFFFF, 1),
+light2 = new THREE.DirectionalLight(0xFFFFFF, 0.5);
+light2.position.set(5, 0, 5);
+light2.castShadow = true;
 
 const topLayer = 0.01;
 
@@ -207,13 +211,13 @@ const randomLine = (radius) => {
 
 function init() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000);
+    scene.background = new THREE.Color(0xFFFFFFF);
 
     updateScene();
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.x = 0.5;
-    camera.position.y = 0.5;
+    camera.position.x = 0;
+    camera.position.y = 0;
     camera.position.z = 1;
 
     renderer = new THREE.WebGLRenderer();
@@ -236,6 +240,9 @@ function init() {
 }
 
 function update() {
+    if (unfolded) {
+        scene.rotation.y += 0.01;
+    }
     requestAnimationFrame(update);
     renderer.render(scene, camera);
 }
@@ -246,24 +253,23 @@ function onResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-function unfoldLast() {
+function unfold() {
     let tr = last;
     while (tr !== undefined) {
         if (tr.type == 'fold') {
             last = new Transform(last, 'unfold', tr);
             step++;
-            // break;  // TODO: Do it better (inherit triangles?..)
         }
         tr = tr.previous;
     }
-    updateScene();
+    unfolded = true;
 }
 
 function updateScene() {
-    scene.children = [light, rulerA, rulerB];
+    scene.children = [light1, light2];
     last.triangles.forEach(t => {
         const color = new THREE.Color();
-        color.setHSL(t.hue, 0.5, 0.5);
+        color.setHSL(t.hue, 1, 0.5);
         const material = new THREE.MeshStandardMaterial({
             color: color,
             side: THREE.DoubleSide,
@@ -276,39 +282,51 @@ function updateScene() {
         );
         scene.add(surface);
     });
-    if (isSelectedLine()) {
-        scene.add(new THREE.Mesh(
-            rulerGeometry(selectedLine()),
-            new THREE.MeshStandardMaterial({
-                color: 0xFF0000,
-                opacity: 0.2,
-                transparent: true,
-            })
-        ));
+    if (!unfolded) {
+        scene.add(rulerA);
+        scene.add(rulerB);
+        if (isSelectedLine()) {
+            scene.add(new THREE.Mesh(
+                rulerGeometry(selectedLine()),
+                new THREE.MeshStandardMaterial({
+                    color: 0xFF0000,
+                    opacity: 0.2,
+                    transparent: true,
+                })
+            ));
+        }
+    }
+}
+
+function onControl(type) {
+    if (!unfolded) {
+        if (type == 'unfold') {
+            unfold();
+        } else if (type == 'fold') {
+            if (isSelectedLine()) {
+                const l = selectedLine();
+                last = new Transform(last, 'fold', l);
+                step++;
+            }
+        } else if (type == 'cut') {
+            const l = selectedLine();
+            last = new Transform(last, 'cut', l);
+            step++;
+        }
+        updateScene();
     }
 }
 
 function onDocumentKeyDown(event) {
-    // console.log('Keypress', event.which)
-    if (event.which == 13) {
-        // ENTER to Refresh
-        updateScene();
-    } else if (event.which == 27) {
-        // ESC to Unfold
-        unfoldLast();
-        updateScene();
-    } else if (event.which == 32) {
-        // SPACE to Fold
-        const l = selectedLine();
-        last = new Transform(last, 'fold', l);
-        step++;
-        updateScene();
-    } else if (event.which == 67) {
-        // "C" to Cut
-        const l = selectedLine();
-        last = new Transform(last, 'cut', l);
-        step++;
-        updateScene();
+    if (!unfolded) {
+        if (event.which == 27) {
+            // ESC to Unfold
+            onControl('unfold');
+        } else if (event.which == 32) {
+            onControl('fold');
+        } else if (event.which == 67) {
+            onControl('cut');
+        }
     }
 }
 
