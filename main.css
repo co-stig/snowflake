@@ -1,9 +1,48 @@
 body {
-    padding: 0;
-    margin: 0;
 }
 
-.controls {
-    padding: 10pt;
-    margin: 10pt;
+.center-screen {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin-right: -50%;
+    transform: translate(-50%, -50%);
+}
+
+button {
+    font-size: 24pt;
+    background-color: transparent;
+    background-repeat: no-repeat;
+    border: none;
+    cursor: pointer;
+    overflow: hidden;
+    outline: none;
+}
+
+.br {
+    position: fixed;
+    bottom: 10pt;
+    right: 10pt;
+}
+
+.bl {
+    position: fixed;
+    bottom: 10pt;
+    left: 10pt;
+}
+
+.tr {
+    position: fixed;
+    top: 10pt;
+    right: 10pt;
+}
+
+.tl {
+    position: fixed;
+    top: 10pt;
+    left: 10pt;
+}
+
+h1 {
+
 }

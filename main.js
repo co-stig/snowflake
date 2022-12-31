@@ -67,12 +67,16 @@ class Transform {
                 if (frontSide) {
                     // Fold / reflect
                     t.reflect(this.input);
-                    t.folds += step;
+                    if (t.folds == 0) {
+                        t.folds = 1;
+                    } else {
+                        t.folds *= 2;
+                    }
                     this.affected.push(t);
                     // console.log('Folded triangle', t);
                 }
             });
-            console.log('Folded', this);
+            //console.log('Folded', this);
         } else if (this.type == 'unfold') {
             this.triangles = this.previous.triangles;
             this.affected = this.previous.affected;
@@ -82,7 +86,7 @@ class Transform {
                 this.recursiveUnfold(t, undo.input);
                 //console.log('Unfolded triangle', t);
             });
-            console.log('Unfolded', this.input);
+            //console.log('Unfolded', this.input);
         } else if (this.type == 'cut') {
             this.triangles = this.previous.triangles.map(
                 t => cutTriangle(t, this.input)
@@ -96,7 +100,7 @@ class Transform {
                     // console.log('Cut triangle', t);
                 }
             });
-            console.log('Cut', this);
+            //console.log('Cut', this);
         } else if (this.type == 'init') {
             this.triangles = this.input;
         } else {
@@ -109,6 +113,13 @@ function initSquare() {
     return [
         new Triangle([{x: -0.5, y: -0.5}, {x: 0.5, y: -0.5}, {x: 0.5, y: 0.5}], 0.25),
         new Triangle([{x: -0.5, y: -0.5}, {x: 0.5, y: 0.5}, {x: -0.5, y: 0.5}], 0.75),
+    ];
+}
+
+function initSolidSquare() {
+    return [
+        new Triangle([{x: -0.5, y: -0.5}, {x: 0.5, y: -0.5}, {x: 0.5, y: 0.5}], 0.5),
+        new Triangle([{x: -0.5, y: -0.5}, {x: 0.5, y: 0.5}, {x: -0.5, y: 0.5}], 0.5),
     ];
 }
 
@@ -129,20 +140,41 @@ function initCircle(n, r) {
     );
 }
 
-let last = new Transform(undefined, 'init', initCircle(20, 0.5));
-//let last = new Transform(undefined, 'init', initSquare());
+function grayscaleColorScheme(t, i, cnt) {
+    const color = new THREE.Color();
+    color.setHSL(0.5, 0, 0.6 + Math.random() * 0.1);
+    return color;
+}
+
+function rainbowColorScheme(t, i, cnt) {
+    const color = new THREE.Color();
+    color.setHSL(i / cnt, 1, 0.5);
+    return color;
+}
+
+function topologyColorScheme(t, i, cnt) {
+    const color = new THREE.Color();
+    color.setHSL(t.hue, 1, 0.5);
+    return color;
+}
+
+const initialGeometry = window.location.search.indexOf('circle') >= 0 ? initCircle(20, 0.5) : initSquare();
+let colorScheme = grayscaleColorScheme;
+
+let last = new Transform(undefined, 'init', initialGeometry);
 
 let scene, camera, renderer;
 let R = 1;
 let step = 0;
 let unfolded = false;
+let rulerPlane = null;
 
 const rulerA = new THREE.Mesh(
     new THREE.SphereGeometry(0.05, 32, 16),
-    new THREE.MeshStandardMaterial({ color: 0x440000 })
+    new THREE.MeshLambertMaterial({ color: 0xAA0000 })
 ), rulerB = new THREE.Mesh(
     new THREE.SphereGeometry(0.05, 32, 16),
-    new THREE.MeshStandardMaterial({ color: 0x440000 })
+    new THREE.MeshLambertMaterial({ color: 0xAA0000 })
 ), light1 = new THREE.AmbientLight(0xFFFFFF, 1),
 light2 = new THREE.DirectionalLight(0xFFFFFF, 0.5);
 light2.position.set(5, 0, 5);
@@ -150,13 +182,13 @@ light2.castShadow = true;
 
 const topLayer = 0.01;
 
-const toGeometry = (triangles) => {
+const toGeometry = (triangles, levels=true) => {
     const geometry = new THREE.Geometry();
     const visible = triangles.filter(t => t.visible);
     const vertices = visible.map(t => ([
-        new THREE.Vector3(t.vertices[0].x, t.vertices[0].y, t.folds * 0.001),
-        new THREE.Vector3(t.vertices[1].x, t.vertices[1].y, t.folds * 0.001),
-        new THREE.Vector3(t.vertices[2].x, t.vertices[2].y, t.folds * 0.001),
+        new THREE.Vector3(t.vertices[0].x, t.vertices[0].y, levels ? t.folds * 0.001 : 0),
+        new THREE.Vector3(t.vertices[1].x, t.vertices[1].y, levels ? t.folds * 0.001 : 0),
+        new THREE.Vector3(t.vertices[2].x, t.vertices[2].y, levels ? t.folds * 0.001 : 0),
     ])).flat();
     geometry.vertices.push(...vertices);
     geometry.faces.push(...(visible.map((t, index) =>
@@ -185,7 +217,6 @@ const rulerGeometry = (line) => {
         new THREE.Face3(0, 1, 2, new THREE.Vector3(0, 0, 1)),
         new THREE.Face3(1, 3, 2, new THREE.Vector3(0, 0, 1)),
     ]);
-    console.log('Ruler', geometry);
     return geometry;
 };
 
@@ -200,22 +231,15 @@ const isSelectedLine = () => {
     return rulerA.position.x !== rulerB.position.x || rulerA.position.y !== rulerB.position.y;
 };
 
-const randomLine = (radius) => {
-    const phi1 = Math.random() * 2 * Math.PI;
-    const phi2 = Math.random() * 2 * Math.PI;
-    return [
-        {x: Math.sin(phi1) * radius + 0.5, y: Math.cos(phi1) * radius + 0.5},
-        {x: Math.sin(phi2) * radius + 0.5, y: Math.cos(phi2) * radius + 0.5},
-    ]
-};
 
 function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xFFFFFFF);
 
-    updateScene();
+    updateScene(colorScheme);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    // camera = new THREE.OrthographicCamera(window.innerWidth / - 1000, window.innerWidth / 1000, window.innerHeight / 1000, window.innerHeight / - 1000, 0.1, 1000);
     camera.position.x = 0;
     camera.position.y = 0;
     camera.position.z = 1;
@@ -230,7 +254,8 @@ function init() {
         renderer.domElement
     );
     controls.addEventListener('drag', function(event) {
-        updateScene();
+        //updateScene();
+        drawRuler();
     });
 
     window.addEventListener('resize', onResize, false);
@@ -265,43 +290,83 @@ function unfold() {
     unfolded = true;
 }
 
-function updateScene() {
+function findCenter(triangles) {
+    let x = 0, y = 0, total = 0;
+    triangles.forEach(t => {
+        if (t.visible) {
+            t.vertices.forEach(v => {
+                x += v.x;
+                y += v.y;
+                total++;
+            });
+        }
+    })
+    return total > 0 ? {
+        x: x / total,
+        y: y / total
+    } : { x: 0, y: 0 };
+}
+
+function move(triangles, dx, dy) {
+    triangles.forEach(t => {
+        t.vertices.forEach(v => {
+            v.x += dx;
+            v.y += dy;
+        });
+    });
+}
+
+function drawRuler() {
+    scene.remove(rulerA);
+    scene.remove(rulerB);
+    if (rulerPlane !== null) {
+        scene.remove(rulerPlane);
+    }
+    if (!unfolded) {
+        scene.add(rulerA);
+        scene.add(rulerB);
+        if (isSelectedLine()) {
+            rulerPlane = new THREE.Mesh(
+                rulerGeometry(selectedLine()),
+                new THREE.MeshLambertMaterial({
+                    color: 0xFF0000,
+                    opacity: 0.2,
+                    transparent: true,
+                })
+            );
+            scene.add(rulerPlane);
+        }
+    }
+}
+
+function updateScene(colorScheme) {
     scene.children = [light1, light2];
-    last.triangles.forEach(t => {
-        const color = new THREE.Color();
-        color.setHSL(t.hue, 1, 0.5);
-        const material = new THREE.MeshStandardMaterial({
+    // TODO: To zoom in automatically
+    //const center = findCenter(last.triangles);
+    //move(last.triangles, -center.x, -center.y);
+    const cnt = last.triangles.length;
+    last.triangles.forEach((t, i) => {
+        const color = colorScheme(t, i, cnt);
+        const material = new THREE.MeshLambertMaterial({
             color: color,
             side: THREE.DoubleSide,
             opacity: 0.8,
             transparent: true,
         });
         let surface = new THREE.Mesh(
-            toGeometry([t]),
+            toGeometry([t], !unfolded),
             material
         );
         scene.add(surface);
     });
-    if (!unfolded) {
-        scene.add(rulerA);
-        scene.add(rulerB);
-        if (isSelectedLine()) {
-            scene.add(new THREE.Mesh(
-                rulerGeometry(selectedLine()),
-                new THREE.MeshStandardMaterial({
-                    color: 0xFF0000,
-                    opacity: 0.2,
-                    transparent: true,
-                })
-            ));
-        }
-    }
+    drawRuler();
 }
 
 function onControl(type) {
     if (!unfolded) {
         if (type == 'unfold') {
             unfold();
+            colorScheme = rainbowColorScheme;
         } else if (type == 'fold') {
             if (isSelectedLine()) {
                 const l = selectedLine();
@@ -313,7 +378,7 @@ function onControl(type) {
             last = new Transform(last, 'cut', l);
             step++;
         }
-        updateScene();
+        updateScene(colorScheme);
     }
 }
 
