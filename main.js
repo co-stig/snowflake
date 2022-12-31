@@ -169,6 +169,8 @@ let step = 0;
 let unfolded = false;
 let rulerPlane = null;
 
+let ctX = 0, ctY = 0, ctZ = 1;      // Camera target
+
 const rulerA = new THREE.Mesh(
     new THREE.SphereGeometry(0.05, 32, 16),
     new THREE.MeshLambertMaterial({ color: 0xAA0000 })
@@ -236,13 +238,8 @@ function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xFFFFFFF);
 
-    updateScene(colorScheme);
-
-    camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera = new THREE.PerspectiveCamera(110, window.innerWidth / window.innerHeight, 0.1, 1000);
     // camera = new THREE.OrthographicCamera(window.innerWidth / - 1000, window.innerWidth / 1000, window.innerHeight / 1000, window.innerHeight / - 1000, 0.1, 1000);
-    camera.position.x = 0;
-    camera.position.y = 0;
-    camera.position.z = 1;
 
     renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -261,6 +258,8 @@ function init() {
     window.addEventListener('resize', onResize, false);
     document.addEventListener('keydown', onDocumentKeyDown, false);
 
+    updateScene(colorScheme);
+
     update();
 }
 
@@ -268,6 +267,23 @@ function update() {
     if (unfolded) {
         scene.rotation.y += 0.01;
     }
+
+    if (Math.abs(camera.position.x - ctX) < 0.01) {
+        camera.position.x = ctX;
+    } else {
+        camera.position.x += (ctX - camera.position.x) / 10;
+    }
+    if (Math.abs(camera.position.y - ctY) < 0.01) {
+        camera.position.y = ctY;
+    } else {
+        camera.position.y += (ctY - camera.position.y) / 10;
+    }
+    if (Math.abs(camera.position.z - ctZ) < 0.01) {
+        camera.position.z = ctZ;
+    } else {
+        camera.position.z += (ctZ - camera.position.z) / 10;
+    }
+
     requestAnimationFrame(update);
     renderer.render(scene, camera);
 }
@@ -291,29 +307,33 @@ function unfold() {
 }
 
 function findCenter(triangles) {
-    let x = 0, y = 0, total = 0;
+    let x = 0, y = 0, xmin = 10, xmax = -10, ymin = 10, ymax = -10, total = 0;
     triangles.forEach(t => {
         if (t.visible) {
             t.vertices.forEach(v => {
                 x += v.x;
                 y += v.y;
+                if (v.x < xmin) {
+                    xmin = v.x;
+                }
+                if (v.y < ymin) {
+                    ymin = v.y;
+                }
+                if (v.x > xmax) {
+                    xmax = v.x;
+                }
+                if (v.y > ymax) {
+                    ymax = v.y;
+                }
                 total++;
             });
         }
     })
     return total > 0 ? {
         x: x / total,
-        y: y / total
-    } : { x: 0, y: 0 };
-}
-
-function move(triangles, dx, dy) {
-    triangles.forEach(t => {
-        t.vertices.forEach(v => {
-            v.x += dx;
-            v.y += dy;
-        });
-    });
+        y: y / total,
+        r: Math.max(xmax - xmin, ymax - ymin)
+    } : { x: 0, y: 0, r: 1 };
 }
 
 function drawRuler() {
@@ -341,9 +361,12 @@ function drawRuler() {
 
 function updateScene(colorScheme) {
     scene.children = [light1, light2];
-    // TODO: To zoom in automatically
-    //const center = findCenter(last.triangles);
-    //move(last.triangles, -center.x, -center.y);
+
+    const center = findCenter(last.triangles);
+    ctX = center.x;
+    ctY = center.y;
+    ctZ = Math.sqrt(center.r);
+
     const cnt = last.triangles.length;
     last.triangles.forEach((t, i) => {
         const color = colorScheme(t, i, cnt);
