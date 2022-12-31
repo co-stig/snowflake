@@ -426,6 +426,9 @@ function onControl(type) {
             const r = Math.random();
             colorScheme = r < 0.33 ? greenColorScheme : (r < 0.66 ? goldColorScheme : rainbowColorScheme);
             scene.background = null;
+            for (let i = 1; i <= 4; ++i) {
+                document.getElementById('b' + i).style.visibility = 'hidden';
+            }
         } else if (type == 'fold') {
             if (isSelectedLine()) {
                 const l = selectedLine();
