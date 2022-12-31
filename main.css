@@ -1,4 +1,5 @@
 body {
+    font-family: Calibri;
 }
 
 .center-screen {
@@ -41,8 +42,4 @@ button {
     position: fixed;
     top: 10pt;
     left: 10pt;
-}
-
-h1 {
-
 }
