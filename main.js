@@ -142,13 +142,19 @@ function initCircle(n, r) {
 
 function grayscaleColorScheme(t, i, cnt) {
     const color = new THREE.Color();
-    color.setHSL(0.5, 0, 0.6 + Math.random() * 0.1);
+    color.setHSL(0.5, 0, 0.5 + Math.random() * 0.1);
     return color;
 }
 
-function hueColorScheme(t, i, cnt) {
+function goldColorScheme(t, i, cnt) {
     const color = new THREE.Color();
-    color.setHSL(0.09 + Math.random() * 0.1, 0.8, 0.6 + Math.random() * 0.1);
+    color.setHSL(0.09 + Math.random() * 0.1, 1, 0.6 + Math.random() * 0.1);
+    return color;
+}
+
+function greenColorScheme(t, i, cnt) {
+    const color = new THREE.Color();
+    color.setHSL(0.3 + Math.random() * 0.1, 1.5, 0.1 + Math.random() * 0.1);
     return color;
 }
 
@@ -183,9 +189,9 @@ const rulerA = new THREE.Mesh(
 ), rulerB = new THREE.Mesh(
     new THREE.SphereGeometry(0.05, 32, 16),
     new THREE.MeshLambertMaterial({ color: 0xFF5500 })
-), light1 = new THREE.AmbientLight(0xFFFFFF, 1),
+), light1 = new THREE.AmbientLight(0xFFFFFF, 1.25),
 light2 = new THREE.DirectionalLight(0xFFFFFF, 0.5);
-light2.position.set(5, 0, 5);
+light2.position.set(5, 1, 5);
 light2.castShadow = true;
 rulerA.position.x = 0;
 rulerA.position.y = 0;
@@ -254,6 +260,8 @@ const isSelectedLine = () => {
 
 
 function init() {
+    document.getElementById('c').style.background = "url('backgrounds/" + Math.floor(Math.random() * 10) + ".jpg') scroll center center / cover";
+
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xFFFFFF);
 
@@ -390,13 +398,17 @@ function updateScene(colorScheme) {
     ctZ = Math.sqrt(center.r);
 
     const cnt = last.triangles.length;
+    const materialType = unfolded ? THREE.MeshStandardMaterial : THREE.MeshLambertMaterial;
     last.triangles.forEach((t, i) => {
         const color = colorScheme(t, i, cnt);
-        const material = new THREE.MeshLambertMaterial({
+        const material = new materialType({
             color: color,
             side: THREE.DoubleSide,
             opacity: unfolded ? 1 : 0.8,
             transparent: true,
+            roughness: 0.5,
+            wireframe: false,
+            metalness: 0.6,
         });
         let surface = new THREE.Mesh(
             toGeometry([t], !unfolded),
@@ -411,7 +423,8 @@ function onControl(type) {
     if (!unfolded) {
         if (type == 'unfold') {
             unfold();
-            colorScheme = hueColorScheme;
+            const r = Math.random();
+            colorScheme = r < 0.33 ? greenColorScheme : (r < 0.66 ? goldColorScheme : rainbowColorScheme);
             scene.background = null;
         } else if (type == 'fold') {
             if (isSelectedLine()) {
