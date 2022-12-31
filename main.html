@@ -7,10 +7,11 @@
     <meta name="viewport" content="minimal-ui, width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 </head>
     <body>
+        <canvas id="c"></canvas>
         <button onclick="onControl('fold')" class="tl">↷</button>
         <button onclick="onControl('cut')" class="tr">✂</button>
         <button onclick="onControl('unfold')" class="bl">🏁</button>
-        <button onclick="window.open('index.html')" class="br">🆕</button>
+        <button onclick="window.open('index.html', '_self')" class="br">🆕</button>
         <script src="three.min.js"></script>
         <script src="OrbitControls.js"></script>
         <script src="DragControls.js"></script>

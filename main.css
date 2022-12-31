@@ -2,6 +2,14 @@ body {
     font-family: Calibri;
 }
 
+#c {
+    width: 100vw;
+    height: 100vh;
+    display: block;
+    background: url(backgrounds/9.jpg) no-repeat center center;
+    background-size: cover;
+}
+
 .center-screen {
     position: absolute;
     top: 50%;

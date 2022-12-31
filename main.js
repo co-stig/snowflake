@@ -146,6 +146,12 @@ function grayscaleColorScheme(t, i, cnt) {
     return color;
 }
 
+function hueColorScheme(t, i, cnt) {
+    const color = new THREE.Color();
+    color.setHSL(0.09 + Math.random() * 0.1, 0.8, 0.6 + Math.random() * 0.1);
+    return color;
+}
+
 function rainbowColorScheme(t, i, cnt) {
     const color = new THREE.Color();
     color.setHSL(i / cnt, 1, 0.5);
@@ -173,14 +179,18 @@ let ctX = 0, ctY = 0, ctZ = 1;      // Camera target
 
 const rulerA = new THREE.Mesh(
     new THREE.SphereGeometry(0.05, 32, 16),
-    new THREE.MeshLambertMaterial({ color: 0xAA0000 })
+    new THREE.MeshLambertMaterial({ color: 0xFF5500 })
 ), rulerB = new THREE.Mesh(
     new THREE.SphereGeometry(0.05, 32, 16),
-    new THREE.MeshLambertMaterial({ color: 0xAA0000 })
+    new THREE.MeshLambertMaterial({ color: 0xFF5500 })
 ), light1 = new THREE.AmbientLight(0xFFFFFF, 1),
 light2 = new THREE.DirectionalLight(0xFFFFFF, 0.5);
 light2.position.set(5, 0, 5);
 light2.castShadow = true;
+rulerA.position.x = 0;
+rulerA.position.y = 0;
+rulerB.position.x = 0.25;
+rulerB.position.y = 0.25;
 
 const topLayer = 0.01;
 
@@ -205,20 +215,29 @@ const toGeometry = (triangles, levels=true) => {
 
 const rulerGeometry = (line) => {
     const geometry = new THREE.Geometry();
-    let shift = {
-        x: line[0].y - line[1].y,
-        y: line[1].x - line[0].x
-    };
-    geometry.vertices.push(...[
-        new THREE.Vector3(line[0].x, line[0].y, topLayer),
-        new THREE.Vector3(line[1].x, line[1].y, topLayer),
-        new THREE.Vector3(line[0].x + shift.x, line[0].y + shift.y, topLayer),
-        new THREE.Vector3(line[1].x + shift.x, line[1].y + shift.y, topLayer),
-    ]);
-    geometry.faces.push(...[
-        new THREE.Face3(0, 1, 2, new THREE.Vector3(0, 0, 1)),
-        new THREE.Face3(1, 3, 2, new THREE.Vector3(0, 0, 1)),
-    ]);
+    const length = Math.sqrt(
+        Math.pow(line[0].x - line[1].x, 2) +
+        Math.pow(line[0].y - line[1].y, 2)
+    );
+    if (length > 0) {
+        let dx = line[1].x - line[0].x;
+        let dy = line[1].y - line[0].y;
+        let r = 10 / length;
+        let shift = {
+            x: -dy * r,
+            y: dx * r
+        };
+        geometry.vertices.push(...[
+            new THREE.Vector3(line[0].x - dx * r, line[0].y - dy * r, topLayer),
+            new THREE.Vector3(line[1].x + dx * r, line[1].y + dy * r, topLayer),
+            new THREE.Vector3(line[0].x + shift.x, line[0].y + shift.y, topLayer),
+            new THREE.Vector3(line[1].x + shift.x, line[1].y + shift.y, topLayer),
+        ]);
+        geometry.faces.push(...[
+            new THREE.Face3(0, 1, 2, new THREE.Vector3(0, 0, 1)),
+            new THREE.Face3(1, 3, 2, new THREE.Vector3(0, 0, 1)),
+        ]);
+    }
     return geometry;
 };
 
@@ -236,12 +255,16 @@ const isSelectedLine = () => {
 
 function init() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xFFFFFFF);
+    scene.background = new THREE.Color(0xFFFFFF);
 
     camera = new THREE.PerspectiveCamera(110, window.innerWidth / window.innerHeight, 0.1, 1000);
     // camera = new THREE.OrthographicCamera(window.innerWidth / - 1000, window.innerWidth / 1000, window.innerHeight / 1000, window.innerHeight / - 1000, 0.1, 1000);
 
-    renderer = new THREE.WebGLRenderer();
+    const canvas = document.querySelector('#c');
+    renderer = new THREE.WebGLRenderer({
+        canvas,
+        alpha: true,
+    });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
@@ -251,7 +274,6 @@ function init() {
         renderer.domElement
     );
     controls.addEventListener('drag', function(event) {
-        //updateScene();
         drawRuler();
     });
 
@@ -349,7 +371,7 @@ function drawRuler() {
             rulerPlane = new THREE.Mesh(
                 rulerGeometry(selectedLine()),
                 new THREE.MeshLambertMaterial({
-                    color: 0xFF0000,
+                    color: 0xFF7700,
                     opacity: 0.2,
                     transparent: true,
                 })
@@ -373,7 +395,7 @@ function updateScene(colorScheme) {
         const material = new THREE.MeshLambertMaterial({
             color: color,
             side: THREE.DoubleSide,
-            opacity: 0.8,
+            opacity: unfolded ? 1 : 0.8,
             transparent: true,
         });
         let surface = new THREE.Mesh(
@@ -389,7 +411,8 @@ function onControl(type) {
     if (!unfolded) {
         if (type == 'unfold') {
             unfold();
-            colorScheme = rainbowColorScheme;
+            colorScheme = hueColorScheme;
+            scene.background = null;
         } else if (type == 'fold') {
             if (isSelectedLine()) {
                 const l = selectedLine();
