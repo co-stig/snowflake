@@ -238,7 +238,7 @@ function init() {
 
     updateScene(colorScheme);
 
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 0.1, 1000);
     // camera = new THREE.OrthographicCamera(window.innerWidth / - 1000, window.innerWidth / 1000, window.innerHeight / 1000, window.innerHeight / - 1000, 0.1, 1000);
     camera.position.x = 0;
     camera.position.y = 0;
