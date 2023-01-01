@@ -429,6 +429,8 @@ function onControl(type) {
             for (let i = 1; i <= 4; ++i) {
                 document.getElementById('b' + i).style.visibility = 'hidden';
             }
+            document.getElementById('c').style.visibility = 'hidden';
+            document.getElementById('c').style.visibility = 'visible';
         } else if (type == 'fold') {
             if (isSelectedLine()) {
                 const l = selectedLine();
