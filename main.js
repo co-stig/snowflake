@@ -274,6 +274,8 @@ function init() {
         alpha: true,
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColorHex( 0xffffff, 1 );
+
     document.body.appendChild(renderer.domElement);
 
     const controls = new DragControls(
@@ -429,8 +431,6 @@ function onControl(type) {
             for (let i = 1; i <= 4; ++i) {
                 document.getElementById('b' + i).style.visibility = 'hidden';
             }
-            document.getElementById('c').style.visibility = 'hidden';
-            document.getElementById('c').style.visibility = 'visible';
         } else if (type == 'fold') {
             if (isSelectedLine()) {
                 const l = selectedLine();
